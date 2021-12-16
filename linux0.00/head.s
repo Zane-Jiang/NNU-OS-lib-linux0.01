@@ -10,20 +10,26 @@ LDT1_SEL	= 0x38
 .global startup_32
 .text
 startup_32:
-	movl $0x10,%eax
+	movl $0x10,%eax   # 0x10是数据段（在boot.s文件中定义）的选择子
 	mov %ax,%ds
 #	mov %ax,%es
 	lss init_stack,%esp
+ #前4个字节是偏移，后2个字节是段选择子，这句代码表示用偏移加载esp，用数据段选择子0x10加载ss.
 
 # setup base fields of descriptors.
 	call setup_idt
+
 	call setup_gdt
+
+
+/*gdt 表改变，需要重新加载所有的段寄存器*/
 	movl $0x10,%eax		# reload all the segment registers
 	mov %ax,%ds		# after changing gdt. 
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
-	lss init_stack,%esp
+	lss init_stack,%esp 
+	
 
 # setup up timer 8253 chip.
 	movb $0x36, %al
@@ -34,6 +40,8 @@ startup_32:
 	outb %al, %dx
 	movb %ah, %al
 	outb %al, %dx
+
+
 
 # setup timer & system call interrupt descriptors.
 	movl $0x00080000, %eax	
@@ -79,19 +87,26 @@ setup_gdt:
 	ret
 
 setup_idt:
-	lea ignore_int,%edx
-	movl $0x00080000,%eax
-	movw %dx,%ax		/* selector = 0x0008 = cs */
-	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
+#组装中断描述门 
+	lea ignore_int,%edx #偏移值高16位组装
+	movl $0x00080000,%eax#段描述符组装
+	movw %dx,%ax		/* selector = 0x0008 = cs */ #偏移值低16位组装
+	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */#edx低16位组装
+	
+
 	lea idt,%edi
+	/*全0的256项中断描述符表*/
 	mov $256,%ecx
 rp_sidt:
 	movl %eax,(%edi)
+	/*movl %eax,(%edi)表示把eax的值传送到地址edi处，即用eax填充IDT表的0~3字节；*/
 	movl %edx,4(%edi)
+	/*movl %edx,4(%edi)表示把edx的值传送到地址[edi+4]处，即用edx填充IDT表的4~7字节；*/
 	addl $8,%edi
 	dec %ecx
+	/*循环填装256个中断门*/
 	jne rp_sidt
-	lidt lidt_opcode
+	lidt lidt_opcode #加载idt寄存器
 	ret
 
 # -----------------------------------
@@ -108,7 +123,9 @@ write_char:
 	incl %ebx
 	cmpl $2000, %ebx
 	jb 1f
+
 	movl $0, %ebx
+
 1:	movl %ebx, scr_loc	
 #	popl %eax
 	popl %ebx
@@ -119,6 +136,7 @@ write_char:
 /* This is the default interrupt "handler" :-) */
 .align 2
 ignore_int:
+	/*默认中断处理程序*/
 	push %ds
 	pushl %eax
 	movl $0x10, %eax
@@ -174,15 +192,18 @@ scr_loc:.long 0
 
 .align 2
 lidt_opcode:
-	.word 256*8-1		# idt contains 256 entries
-	.long idt		# This will be rewrite by code. 
+	.word 256*8-1		# idt contains 256 entries 限长
+	.long idt		# This will be rewrite by code.  起始位置
 lgdt_opcode:
 	.word (end_gdt-gdt)-1	# so does gdt 
 	.long gdt		# This will be rewrite by code.
 
 	.align 8
 idt:	.fill 256,8,0		# idt is uninitialized
+/*表示产生8*256字节，全部用0填充。IDT最多可有256个描述符，每个描述符占8个字节。*/
 
+
+#定义了8个段
 gdt:	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x00c09a00000007ff	/* 8Mb 0x08, base = 0x00000 */
 	.quad 0x00c09200000007ff	/* 8Mb 0x10 */

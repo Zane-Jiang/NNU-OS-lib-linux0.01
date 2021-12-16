@@ -46,16 +46,23 @@ ok_load:
 
 ! absolute address 0x00000, in 32-bit protected mode.
 	mov	ax,#0x0001	! protected mode (PE) bit
-	lmsw	ax		! This is it!
+	lmsw	ax		! This is it!lmsw是加载机器状态字指令，后接16位寄存器或者内存地址。
+	!其功能是用源操作数的低4位加载CR0，也就是说仅会影响CR0的低4位——PE, MP, EM, TS。
 	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
 
+
+!定义了三个段描述符，其中第一个段不可用
 gdt:	.word	0,0,0,0		! dummy
 
+	!第1个描述符定义了一个代码段，其基地址为0，界限值是0x7FF（10进制2047），
+	!粒度4KB，DPL=0，非一致性，可读可执行。因为粒度是4KB，所以段长度是（2047+1）*4KB=8MB。
 	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
 	.word	0x0000		! base address=0x00000
 	.word	0x9A00		! code read/exec
 	.word	0x00C0		! granularity=4096, 386
 
+	!第2个描述符定义了一个数据段，其基地址为0，
+	!界限值是0x7FF（10进制2047），粒度4KB，DPL=0，向上扩展，可读可写。同上，段长度是8MB。
 	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
 	.word	0x0000		! base address=0x00000
 	.word	0x9200		! data read/write
