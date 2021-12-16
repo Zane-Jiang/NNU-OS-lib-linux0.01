@@ -114,17 +114,28 @@ write_char:
 	push %gs
 	pushl %ebx
 #	pushl %eax
-	mov $SCRN_SEL, %ebx
-	mov %bx, %gs
-	movl scr_loc, %ebx
+	mov $SCRN_SEL, %ebx#SCRN_SEL是显存段的选择子
+	mov %bx, %gs #gs指向显存段
+	movl scr_loc, %ebx#scr_loc处存放的是显示位置
 	shl $1, %ebx
 	movb %al, %gs:(%ebx)
 	shr $1, %ebx
 	incl %ebx
+
 	cmpl $2000, %ebx
 	jb 1f
-
-	movl $0, %ebx
+roll_screen:
+	movl $0x00a0,%esi#第一行的起始地址
+	movl $0x0000,%edi 
+	mov $1920,%cx
+	rep movsw 
+	mov $3840,%ebx
+	mov $80,%cx
+cls:
+	movw $0x0720,%gs:(%ebx)
+	add $2,%ebx
+	loop cls
+	movl $1920, %ebx
 
 1:	movl %ebx, scr_loc	
 #	popl %eax
