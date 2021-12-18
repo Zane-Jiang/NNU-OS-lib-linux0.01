@@ -35,7 +35,8 @@ startup_32:
 	movb $0x36, %al
 	movl $0x43, %edx
 	outb %al, %dx
-	movl $11930, %eax        # timer frequency 100 HZ 
+	movl $11930, %eax        # timer frequency 100 HZ
+    #movl $0xFFFF,%eax  #down timer slow
 	movl $0x40, %edx
 	outb %al, %dx
 	movb %ah, %al
@@ -113,24 +114,44 @@ rp_sidt:
 write_char:
 	push %gs
 	pushl %ebx
-#	pushl %eax
-	mov $SCRN_SEL, %ebx#SCRN_SEL是显存段的选择子
-	mov %bx, %gs #gs指向显存段
-	movl scr_loc, %ebx#scr_loc处存放的是显示位置
+    push %es
+	pushl %esi
+	pushl %edi
+
+    mov $SCRN_SEL,%ebx
+	mov %bx,%gs
+    mov %bx,%es
+	movl scr_loc, %ebx
 	shl $1, %ebx
-	movb %al, %gs:(%ebx)
+    movw %ax,%gs:(%ebx)
 	shr $1, %ebx
 	incl %ebx
-
 	cmpl $2000, %ebx
 	jb 1f
 roll_screen:
-	movl $0x00a0,%esi#第一行的起始地址
+	movl $0x00a0,%esi
 	movl $0x0000,%edi 
+/*    movw $1920,%cx
+mf1:
+    movw %gs:(%esi),%bx
+    movw %bx,%gs:(%edi)
+    add $2, %esi
+    add $2,%edi
+    sub $1,%cx
+    loop mf1
+  */
+
+	cld
 	mov $1920,%cx
-	rep movsw 
-	mov $3840,%ebx
-	mov $80,%cx
+
+    push %ds
+    movw  %gs,%bx
+	mov %bx,%ds
+    rep movsw 
+	pop %ds
+    
+    movl $3840,%ebx
+	movw $80,%cx
 cls:
 	movw $0x0720,%gs:(%ebx)
 	add $2,%ebx
@@ -138,9 +159,11 @@ cls:
 	movl $1920, %ebx
 
 1:	movl %ebx, scr_loc	
-#	popl %eax
 	popl %ebx
+	popl %esi
+	popl %edi
 	pop %gs
+    pop %es
 	ret
 
 /***********************************************/
@@ -271,7 +294,8 @@ task0:
 	movl $0x17, %eax
 	movw %ax, %ds
 	movb $65, %al              /* print 'A' */
-	int $0x80
+    movb $2,%ah #set color
+    int $0x80
 	movl $0xfff, %ecx
 1:	loop 1b
 	jmp task0 
@@ -280,7 +304,8 @@ task1:
 	movl $0x17, %eax
 	movw %ax, %ds
 	movb $66, %al              /* print 'B' */
-	int $0x80
+	movb $5,%ah  #set color
+    int $0x80
 	movl $0xfff, %ecx
 1:	loop 1b
 	jmp task1
