@@ -4,6 +4,6 @@ echo 'delete Image finished '
 echo "new compile ......"
 make
 make clean
-echo"compile finished !"
+echo "compile finished !"
 bochs -f bochs_linux00.bxrc
 
