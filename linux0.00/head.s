@@ -52,7 +52,6 @@ startup_32:
 	outb %al, %dx
 
 
-
 # setup timer & system call interrupt descriptors.
 	movl $0x00080000, %eax	
 	movw $timer_interrupt, %ax
@@ -61,12 +60,23 @@ startup_32:
 	lea idt(,%ecx,8), %esi
 	movl %eax,(%esi) 
 	movl %edx,4(%esi)
+
 	movw $system_interrupt, %ax
 	movw $0xef00, %dx
 	movl $0x80, %ecx
 	lea idt(,%ecx,8), %esi
 	movl %eax,(%esi) 
 	movl %edx,4(%esi)
+
+#setup up keyboard call interrupt descriptor
+	movl $0x00080000, %eax	
+	movw $keyboard_interrupt, %ax
+	movw $0x8f00, %dx  #中断门
+	movl $0x09, %ecx              # The PC default keyboard int.
+	lea idt(,%ecx,8), %esi
+	movl %eax,(%esi) 
+	movl %edx,4(%esi)
+
 
 # unmask the timer interrupt.
 #	movl $0x21, %edx
@@ -235,6 +245,29 @@ timer_interrupt:
 
     cli
 4: 	popl %eax
+	pop %ds
+	iret
+
+/*keyboard_interrupt  call hander*/
+.align 2
+keyboard_interrupt
+	push %ds
+	pushl %edx
+	pushl %ecx
+	pushl %ebx
+	pushl %eax
+
+	inb $60H,%AL
+	cmp $65,%AL
+	jne	pressD
+pressC:
+	movl $3,current
+	ljmp $TSS3_SEL, $0
+pressD:
+	popl %eax
+	popl %ebx
+	popl %ecx
+	popl %edx
 	pop %ds
 	iret
 
