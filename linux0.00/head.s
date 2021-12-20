@@ -202,6 +202,8 @@ timer_interrupt:
 	movb $0x20, %al
 	outb %al, $0x20
 
+
+    sti
 	movl $1, %eax
 	cmpl %eax, current
 	je 1f
@@ -221,13 +223,17 @@ timer_interrupt:
 
 1:	movl $2, current
 	ljmp $TSS2_SEL, $0
+    jmp 4f
 
 2:	movl $3,current
 	ljmp $TSS3_SEL, $0
+    jmp 4f
 
 3:	movl $0,current
 	ljmp $TSS0_SEL,$0	
-	
+	jmp 4f
+
+    cli
 4: 	popl %eax
 	pop %ds
 	iret
