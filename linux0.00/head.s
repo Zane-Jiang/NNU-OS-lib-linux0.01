@@ -250,7 +250,7 @@ timer_interrupt:
 
 /*keyboard_interrupt  call hander*/
 .align 2
-keyboard_interrupt
+keyboard_interrupt:
 	push %ds
 	pushl %edx
 	pushl %ecx
