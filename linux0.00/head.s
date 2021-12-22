@@ -44,8 +44,8 @@ startup_32:
 	movb $0x36, %al
 	movl $0x43, %edx
 	outb %al, %dx
-	movl $11930, %eax        # timer frequency 100 HZ
-    #movl $0xFFFF,%eax  #down timer slow
+	#movl $11930, %eax        # timer frequency 100 HZ
+    movl $0xFFFFFF,%eax  #down timer slow
 	movl $0x40, %edx
 	outb %al, %dx
 	movb %ah, %al
@@ -79,10 +79,10 @@ startup_32:
 
 
 # unmask the timer interrupt.
-#	movl $0x21, %edx
-#	inb %dx, %al
-#	andb $0xfe, %al
-#	outb %al, %dx
+	#movl $0x21, %edx
+	#inb %dx, %al
+	#andb $0xfe, %al
+	#outb %al, %dx
 
 # Move to user mode (task 0)
 	pushfl
@@ -136,7 +136,7 @@ write_char:
     push %es
 	pushl %esi
 	pushl %edi
-
+	sti
     mov $SCRN_SEL,%ebx
 	mov %bx,%gs
     mov %bx,%es
@@ -150,27 +150,13 @@ write_char:
 roll_screen:
 	movl $0x00a0,%esi
 	movl $0x0000,%edi 
-/*    movw $1920,%cx
-mf1:
-    movw %gs:(%esi),%bx
-    movw %bx,%gs:(%edi)
-    add $2, %esi
-    add $2,%edi
-    sub $1,%cx
-    loop mf1
-  */
-
-	cld
+	
 	mov $1920,%cx
-
     push %ds
-    
     movw  %gs,%bx
 	mov %bx,%ds
     rep movsw
-   
 	pop %ds
-    
     movl $3840,%ebx
 	movw $80,%cx
 cls:
@@ -180,11 +166,13 @@ cls:
 	movl $1920, %ebx
 
 1:	movl %ebx, scr_loc	
-	popl %ebx
-	popl %esi
+	
 	popl %edi
+	popl %esi
+	pop %es
+	popl %ebx
 	pop %gs
-    pop %es
+    
 	ret
 
 /***********************************************/
@@ -213,7 +201,45 @@ timer_interrupt:
 	outb %al, $0x20
 
 
-    sti
+#use task 3 to test key_interrupt
+
+
+	movl $3, %eax
+	cmpl %eax, current
+	jne 0f
+
+	movl $1,%eax
+	movl %eax, current
+	ljmp $TSS1_SEL, $0
+	jmp 4f
+	
+
+0:	movl $1, %eax
+	cmpl %eax, current
+	je 1f
+
+	movl $2,%eax
+	cmpl %eax,current
+	je 2f
+	
+	
+	movl $1,%eax
+	movl %eax, current
+	ljmp $TSS1_SEL, $0
+	
+	jmp 4f
+
+1:	movl $2, current
+	ljmp $TSS2_SEL, $0
+    jmp 4f
+
+2:	movl $0,current
+	ljmp $TSS0_SEL, $0
+    jmp 4f
+/*
+   
+
+  
 	movl $1, %eax
 	cmpl %eax, current
 	je 1f
@@ -242,9 +268,14 @@ timer_interrupt:
 3:	movl $0,current
 	ljmp $TSS0_SEL,$0	
 	jmp 4f
+*/
+	
 
-    cli
-4: 	popl %eax
+	// erorr ! look here!
+4: 	
+	movl $0xccfff, %ecx
+aa:	loop aa
+	popl %eax
 	pop %ds
 	iret
 
@@ -253,20 +284,33 @@ timer_interrupt:
 keyboard_interrupt:
 	push %ds
 	pushl %edx
-	pushl %ecx
 	pushl %ebx
 	pushl %eax
+/*
+	inb $60,%AL
+	cmp $0x1E,%AL
+	jne endd
+*/
+	
 
-	inb $60H,%AL
-	cmp $65,%AL
-	jne	pressD
-pressC:
-	movl $3,current
+	/*delay:
+	movl $0xffff,%ecx
+	loop delay*/
+
+	movl $0x10, %eax
+	mov %ax, %ds
+	movb $0x20, %al
+	outb %al, $0x20
+
+	movl $3,%eax
+	movl %eax, current
 	ljmp $TSS3_SEL, $0
-pressD:
+
+	
+
+endd:
 	popl %eax
 	popl %ebx
-	popl %ecx
 	popl %edx
 	pop %ds
 	iret
@@ -404,20 +448,21 @@ task0:
 	movb $65, %al              /* print 'A' */
    	movb $2,%ah #set color
     	int $0x80
-	movl $0xfff, %ecx
+	movl $0xffff, %ecx
 1:	loop 1b
 	jmp task0 
-
+	
 task1:
+	
 	movl $0x17, %eax
 	movw %ax, %ds
 	movb $66, %al              /* print 'B' */
 	movb $5,%ah  #set color
     	int $0x80
-	movl $0xfff, %ecx
+	movl $0xffff, %ecx
 1:	loop 1b
 	jmp task1
-
+	
 	.fill 128,4,0 
 usr_stk1:
 
@@ -427,24 +472,25 @@ task2:
 	movb $67, %al              /* print 'C' */
 	movb $6,%ah  #set color
     	int $0x80
-	movl $0xfff, %ecx
+	movl $0xffff, %ecx
 1:	loop 1b
 	jmp task2
-
+	
 	.fill 128,4,0 
 usr_stk2:
 
 
 task3:
+	
 	movl $0x17,%eax
 	movw %ax, %ds
 	movb $68, %al              /* print 'D' */
 	movb $7,%ah  #set color
     	int $0x80
-	movl $0xfff, %ecx
+	movl $0xffff, %ecx
 1:	loop 1b
 	jmp task3
-
+	
 	.fill 128,4,0 
 usr_stk3:
 
