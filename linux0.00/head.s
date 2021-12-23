@@ -44,8 +44,8 @@ startup_32:
 	movb $0x36, %al
 	movl $0x43, %edx
 	outb %al, %dx
-	#movl $11930, %eax        # timer frequency 100 HZ
-    movl $0xFFFFFF,%eax  #down timer slow
+	movl $11930, %eax        # timer frequency 100 HZ
+    #movl $0xFFF,%eax  #down timer slow
 	movl $0x40, %edx
 	outb %al, %dx
 	movb %ah, %al
@@ -131,12 +131,12 @@ rp_sidt:
 
 # -----------------------------------
 write_char:
+	cli
 	push %gs
 	pushl %ebx
     push %es
 	pushl %esi
 	pushl %edi
-	sti
     mov $SCRN_SEL,%ebx
 	mov %bx,%gs
     mov %bx,%es
@@ -166,12 +166,18 @@ cls:
 	movl $1920, %ebx
 
 1:	movl %ebx, scr_loc	
-	
+pushl %ecx
+	movl $0xff, %ecx
+aa:	loop aa
+
+popl %ecx
 	popl %edi
 	popl %esi
 	pop %es
+	
 	popl %ebx
 	pop %gs
+	sti
     
 	ret
 
@@ -194,37 +200,40 @@ ignore_int:
 .align 2
 timer_interrupt:
 	push %ds
+	pushl %ebx
 	pushl %eax
 	movl $0x10, %eax
 	mov %ax, %ds
+	
 	movb $0x20, %al
 	outb %al, $0x20
-
+	popl %eax
+	
 
 #use task 3 to test key_interrupt
 
 
-	movl $3, %eax
-	cmpl %eax, current
+	movl $3, %ebx
+	cmpl %ebx, current
 	jne 0f
 
-	movl $1,%eax
-	movl %eax, current
+	movl $1,%ebx
+	movl %ebx, current
 	ljmp $TSS1_SEL, $0
 	jmp 4f
 	
 
-0:	movl $1, %eax
-	cmpl %eax, current
+0:	movl $1, %ebx
+	cmpl %ebx, current
 	je 1f
 
-	movl $2,%eax
-	cmpl %eax,current
+	movl $2,%ebx
+	cmpl %ebx,current
 	je 2f
 	
 	
-	movl $1,%eax
-	movl %eax, current
+	movl $1,%ebx
+	movl %ebx, current
 	ljmp $TSS1_SEL, $0
 	
 	jmp 4f
@@ -271,11 +280,11 @@ timer_interrupt:
 */
 	
 
-	// erorr ! look here!
+	# erorr ! look here!
 4: 	
-	movl $0xccfff, %ecx
-aa:	loop aa
-	popl %eax
+	#movl $0xccfff, %ecx
+#aa:	loop aa
+	popl %ebx
 	pop %ds
 	iret
 
@@ -309,6 +318,8 @@ keyboard_interrupt:
 	
 
 endd:
+movb $0x20, %al
+	outb %al, $0x20
 	popl %eax
 	popl %ebx
 	popl %edx
@@ -448,7 +459,7 @@ task0:
 	movb $65, %al              /* print 'A' */
    	movb $2,%ah #set color
     	int $0x80
-	movl $0xffff, %ecx
+	movl $0xff, %ecx
 1:	loop 1b
 	jmp task0 
 	
@@ -459,7 +470,7 @@ task1:
 	movb $66, %al              /* print 'B' */
 	movb $5,%ah  #set color
     	int $0x80
-	movl $0xffff, %ecx
+	movl $0xff, %ecx
 1:	loop 1b
 	jmp task1
 	
@@ -472,7 +483,7 @@ task2:
 	movb $67, %al              /* print 'C' */
 	movb $6,%ah  #set color
     	int $0x80
-	movl $0xffff, %ecx
+	movl $0xff, %ecx
 1:	loop 1b
 	jmp task2
 	
@@ -487,7 +498,7 @@ task3:
 	movb $68, %al              /* print 'D' */
 	movb $7,%ah  #set color
     	int $0x80
-	movl $0xffff, %ecx
+	movl $0xff, %ecx
 1:	loop 1b
 	jmp task3
 	
