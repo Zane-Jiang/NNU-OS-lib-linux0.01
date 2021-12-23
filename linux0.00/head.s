@@ -300,6 +300,7 @@ keyboard_interrupt:
 	cmp $0x1E,%AL
 	jne endd
 */
+
 	
 
 	/*delay:
@@ -347,6 +348,7 @@ system_interrupt:
 /*********************************************/
 current:.long 0
 scr_loc:.long 0
+key:.long 0
 
 .align 2
 lidt_opcode:
