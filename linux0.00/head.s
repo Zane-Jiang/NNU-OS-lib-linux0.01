@@ -44,8 +44,8 @@ startup_32:
 	movb $0x36, %al
 	movl $0x43, %edx
 	outb %al, %dx
-	movl $11930, %eax        # timer frequency 100 HZ
-    #movl $0xFFF,%eax  #down timer slow
+	#movl $11930, %eax        # timer frequency 100 HZ
+    movl $0xFFFF,%eax  #down timer slow
 	movl $0x40, %edx
 	outb %al, %dx
 	movb %ah, %al
@@ -199,6 +199,7 @@ ignore_int:
 /* Timer interrupt handler */ 
 .align 2
 timer_interrupt:
+cli
 	push %ds
 	pushl %ebx
 	pushl %eax
@@ -207,83 +208,94 @@ timer_interrupt:
 	
 	movb $0x20, %al
 	outb %al, $0x20
-	popl %eax
-	
-
-#use task 3 to test key_interrupt
 
 
-	movl $3, %ebx
+
+	movb $0x00,%al
+	cmp %al,key
+jne key_schedule #key not equal zero,
+timer_schedule:
+	movl $0, %ebx
 	cmpl %ebx, current
-	jne 0f
-
+	jne 1f
 	movl $1,%ebx
 	movl %ebx, current
 	ljmp $TSS1_SEL, $0
-	jmp 4f
-	
-
-0:	movl $1, %ebx
+	jmp sche_ret
+1:	movl $1, %ebx
 	cmpl %ebx, current
-	je 1f
-
+	jne 2f
 	movl $2,%ebx
-	cmpl %ebx,current
-	je 2f
-	
-	
-	movl $1,%ebx
 	movl %ebx, current
-	ljmp $TSS1_SEL, $0
-	
-	jmp 4f
-
-1:	movl $2, current
 	ljmp $TSS2_SEL, $0
-    jmp 4f
-
-2:	movl $0,current
+	jmp sche_ret
+2:	movl $2, %ebx
+	cmpl %ebx, current
+	jne 3f
+	movl $3,%ebx
+	movl %ebx, current
+	ljmp $TSS3_SEL, $0
+	jmp sche_ret
+3:	movl $0,%ebx
+	movl %ebx, current
 	ljmp $TSS0_SEL, $0
-    jmp 4f
-/*
-   
+	jmp sche_ret
 
-  
-	movl $1, %eax
-	cmpl %eax, current
-	je 1f
+
+key_schedule:
+	
+
+key_eq_a:	
+	movb  0x1E,%al
+	cmpb %al,key
+	jne key_eq_b
+	movb $0,key
+	movl $0,%eax
+	cmpl %eax,current
+	je  sche_ret
+	movl $0,current
+	ljmp $TSS0_SEL,$0
+	jmp sche_ret
+key_eq_b:
+	movb  0x30,%al
+	cmpb %al,key
+	jne key_eq_c
+	movb $0,key
+	movl $1,%eax
+	cmpl %eax,current
+	je  sche_ret
+	movl $1,current
+	ljmp $TSS1_SEL,$0
+	jmp sche_ret
+key_eq_c:
+	movb  0x2E,%al
+	cmpb %al,key
+	jne key_eq_d
+	movb $0,key
 	movl $2,%eax
 	cmpl %eax,current
-	je 2f
-	
-	movl $3, %eax
+	je  sche_ret
+	movl $2,current
+	ljmp $TSS2_SEL,$0
+	jmp sche_ret
+key_eq_d:
+	movb  0x20,%al
+	cmpb %al,key
+	jne key_eq_other
+	movb $0,key
+	movl $3,%eax
 	cmpl %eax,current
-	je 3f
+	je  sche_ret
+	movl $3,current
+	ljmp $TSS3_SEL,$0
+	jmp sche_ret
+key_eq_other:
+	movb $0,key
+	jmp timer_schedule
 	
-	movl $1,%eax
-	movl %eax, current
-	ljmp $TSS1_SEL, $0
-	
-	jmp 4f
-
-1:	movl $2, current
-	ljmp $TSS2_SEL, $0
-    jmp 4f
-
-2:	movl $3,current
-	ljmp $TSS3_SEL, $0
-    jmp 4f
-
-3:	movl $0,current
-	ljmp $TSS0_SEL,$0	
-	jmp 4f
-*/
-	
-
-	# erorr ! look here!
-4: 	
-	#movl $0xccfff, %ecx
-#aa:	loop aa
+sche_ret: 	
+	sti
+	popl %eax
 	popl %ebx
 	pop %ds
 	iret
@@ -293,36 +305,20 @@ timer_interrupt:
 keyboard_interrupt:
 	push %ds
 	pushl %edx
+	pushl %ecx
 	pushl %ebx
 	pushl %eax
-/*
-	inb $60,%AL
-	cmp $0x1E,%AL
-	jne endd
-*/
-
-	
-
-	/*delay:
-	movl $0xffff,%ecx
-	loop delay*/
 
 	movl $0x10, %eax
 	mov %ax, %ds
+	inb $0x60,%al
+	movb  $0x47,%ah
+	call write_char
 	movb $0x20, %al
-	outb %al, $0x20
-
-	movl $3,%eax
-	movl %eax, current
-	ljmp $TSS3_SEL, $0
-
-	
-
-endd:
-movb $0x20, %al
 	outb %al, $0x20
 	popl %eax
 	popl %ebx
+	popl %ecx
 	popl %edx
 	pop %ds
 	iret
@@ -348,7 +344,7 @@ system_interrupt:
 /*********************************************/
 current:.long 0
 scr_loc:.long 0
-key:.long 0
+key:.byte 0
 
 .align 2
 lidt_opcode:
@@ -461,7 +457,7 @@ task0:
 	movb $65, %al              /* print 'A' */
    	movb $2,%ah #set color
     	int $0x80
-	movl $0xff, %ecx
+	movl $0xffff, %ecx
 1:	loop 1b
 	jmp task0 
 	
@@ -472,7 +468,7 @@ task1:
 	movb $66, %al              /* print 'B' */
 	movb $5,%ah  #set color
     	int $0x80
-	movl $0xff, %ecx
+	movl $0xffff, %ecx
 1:	loop 1b
 	jmp task1
 	
@@ -485,7 +481,7 @@ task2:
 	movb $67, %al              /* print 'C' */
 	movb $6,%ah  #set color
     	int $0x80
-	movl $0xff, %ecx
+	movl $0xffff, %ecx
 1:	loop 1b
 	jmp task2
 	
@@ -500,7 +496,7 @@ task3:
 	movb $68, %al              /* print 'D' */
 	movb $7,%ah  #set color
     	int $0x80
-	movl $0xff, %ecx
+	movl $0xffff, %ecx
 1:	loop 1b
 	jmp task3
 	
