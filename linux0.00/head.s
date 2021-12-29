@@ -203,20 +203,20 @@ cli
 	push %ds
 	pushl %ebx
 	pushl %eax
+
 	movl $0x10, %eax
 	mov %ax, %ds
-	
 	movb $0x20, %al
 	outb %al, $0x20
 
 
-
-	movb $0x00,%al
+	movb $0x12,%al# E mark code
 	cmp %al,key
-jne key_schedule #key not equal zero,
+	jne key_schedule 
+
 timer_schedule:
 	movl $0, %ebx
-	cmpl %ebx, current
+	cmpl %ebx, current	
 	jne 1f
 	movl $1,%ebx
 	movl %ebx, current
@@ -240,59 +240,53 @@ timer_schedule:
 	movl %ebx, current
 	ljmp $TSS0_SEL, $0
 	jmp sche_ret
-
-
 key_schedule:
-	
-
-key_eq_a:	
-	movb  0x1E,%al
-	cmpb %al,key
-	jne key_eq_b
-	movb $0,key
-	movl $0,%eax
-	cmpl %eax,current
-	je  sche_ret
-	movl $0,current
-	ljmp $TSS0_SEL,$0
+check_a:
+	mov $0x1e,%al# mark code
+	cmp %al,key
+	jnz check_b
+	key_eq_a:
+		movl $0,%eax
+		cmpl %eax,current
+		je sche_ret
+		movl $0,current
+		ljmp $TSS0_SEL,$0
+		jmp sche_ret
+check_b:
+	mov $0x30,%al# mark code
+	cmp %al,key
+	jnz check_c
+	key_eq_b:
+		movl $1,%eax
+		cmpl %eax,current
+		je sche_ret
+		movl $1,current
+		ljmp $TSS1_SEL,$0
+		jmp sche_ret
+check_c:
+	mov $0x2e,%al# mark code
+	cmp %al,key
+	jnz check_d
+	key_eq_c:
+		movl $2,%eax
+		cmpl %eax,current
+		je sche_ret
+		movl $2,current
+		ljmp $TSS2_SEL,$0
+		jmp sche_ret
+check_d:
+	mov $0x20,%al# mark code
+	cmp %al,key
+	jnz check_other
+	key_eq_d:
+		movl $3,%eax
+		cmpl %eax,current
+		je sche_ret
+		movl $3,current
+		ljmp $TSS3_SEL,$0
+		jmp sche_ret
+check_other:
 	jmp sche_ret
-key_eq_b:
-	movb  0x30,%al
-	cmpb %al,key
-	jne key_eq_c
-	movb $0,key
-	movl $1,%eax
-	cmpl %eax,current
-	je  sche_ret
-	movl $1,current
-	ljmp $TSS1_SEL,$0
-	jmp sche_ret
-key_eq_c:
-	movb  0x2E,%al
-	cmpb %al,key
-	jne key_eq_d
-	movb $0,key
-	movl $2,%eax
-	cmpl %eax,current
-	je  sche_ret
-	movl $2,current
-	ljmp $TSS2_SEL,$0
-	jmp sche_ret
-key_eq_d:
-	movb  0x20,%al
-	cmpb %al,key
-	jne key_eq_other
-	movb $0,key
-	movl $3,%eax
-	cmpl %eax,current
-	je  sche_ret
-	movl $3,current
-	ljmp $TSS3_SEL,$0
-	jmp sche_ret
-key_eq_other:
-	movb $0,key
-	jmp timer_schedule
-	
 sche_ret: 	
 	sti
 	popl %eax
@@ -303,6 +297,7 @@ sche_ret:
 /*keyboard_interrupt  call hander*/
 .align 2
 keyboard_interrupt:
+	push %es
 	push %ds
 	pushl %edx
 	pushl %ecx
@@ -311,16 +306,39 @@ keyboard_interrupt:
 
 	movl $0x10, %eax
 	mov %ax, %ds
+	mov %ax, %es
+
+	xor %al,%al
 	inb $0x60,%al
-	movb  $0x47,%ah
-	call write_char
+	
+	movb $0x12,%ah#e
+	cmp %al,%ah
+	je set_key
+	movb $0x1e,%ah#a
+	cmp %al,%ah
+	je set_key
+	movb $0x30,%ah#b
+	cmp %al,%ah
+	je set_key
+	movb $0x2e,%ah#c
+	cmp %al,%ah
+	je set_key
+	movb $0x20,%ah#d
+	cmp %al,%ah
+	je set_key
+	jmp end_key_inter
+set_key:	
+	movb %al,key
+	
+end_key_inter:
 	movb $0x20, %al
-	outb %al, $0x20
+	outb %al, $0x20		
 	popl %eax
 	popl %ebx
 	popl %ecx
 	popl %edx
 	pop %ds
+	pop %es
 	iret
 
 /* system call handler */
@@ -344,7 +362,7 @@ system_interrupt:
 /*********************************************/
 current:.long 0
 scr_loc:.long 0
-key:.byte 0
+key:.byte 0x12
 
 .align 2
 lidt_opcode:
